@@ -2,7 +2,7 @@ import os
 import time
 
 # Directory to be monitored
-directory = '/path/to/directory'
+directory = 'C:\Users\dnc\OneDrive - QlikTech Inc\Documents\GitHub\31github'
 
 # Dictionary of file categories and their extensions
 categories = {
