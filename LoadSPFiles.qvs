@@ -1,0 +1,103 @@
+sub LoadSharepointWild (pConn,pSite,pPath,pFile,pFmt,pWhere,pStatus)
+
+// Initialise return parameters.
+Set pStatus = -1; // Error.
+
+// Check input parameters.
+If Len('$(pFmt)') = 0 Then
+	Trace ERROR: Subroutine LoadSharepointWild.;
+    Trace ERROR: Insufficient arguments.;
+    Trace USAGE: Call LoadSharepointWild(Conn,Site,Path,File,Fmt[,Where,Status]);
+    Exit Sub;
+End If
+
+// Process input parameters.
+// Use local(w) variables to prevent copy back from sub.
+
+Set wSite = /sites/$(pSite);
+
+// Strip trailing / from pPath, If it exists.
+// A null pPath is permitted.
+Set wPath = '$(pPath)';
+If Right(wPath,1) = '/' Then
+    Let wPath = Left(wPath,Len(wPath)-1);
+End If
+
+// Form Where statement from clause pWhere.
+// A null pWhere is permitted.
+If Len('$(pWhere)') > 0 Then
+	Set wWhere = Where $(pWhere);
+Else
+	Set wWhere = '';
+End If
+
+// Load a list of matching files from the Sharepoint metadata
+// connection.  This is assumed to be named the same as the
+// primary, with a suffix '-meta'.
+
+Lib Connect To '$(pConn)-meta';
+
+// Table _TempList shouldn't exist, but if it does, drop it.
+If TableNumber('_TempList') >= 0 Then
+	Drop Table _TempList;
+End If
+
+_TempList:
+NoConcatenate Load Name As FileName
+Where WildMatch(Name,'$(pFile)')>0
+;
+SELECT Name
+FROM ListFiles
+WITH PROPERTIES (
+subSite='$(wSite)',
+folder='$(wSite)$(wPath)',
+)
+;
+Let wNum = NoOfRows('_TempList');
+
+// Loop through the files in the metadata list and load them
+// into _TempLoad using the supplied Where clause.
+// Concatenate Load is used to ensure all files are loaded
+// into the return table, even if the fields are different.
+
+If '$(wNum)' > 0 Then
+
+    // Table _TempLoad shouldn't exist, but if it does, drop it.
+    If TableNumber('_TempLoad') >= 0 Then
+		Drop Table _TempLoad;
+	End If
+    
+    Set wLoadPrefix = 'NoConcatenate';
+	For wRow = 0 to wNum-1
+    	Let wFile = Peek('FileName',wRow,'_TempList');
+        Data:
+        $(wLoadPrefix)
+    	Add LOAD [Assembly code] as [Assembly Code], 
+	     right("Equipment number [KEN]",8)&'|'&[Assembly code] as [Event ID],
+		 if(subfield(FileBaseName(),'_',2)='FL','Field Letter','Express Letter') as [Event Type],
+	     [NEB activity code] as [NEB Activity Code], 
+	     [Description of Letter] as [L01 Job description Key], 
+	     date#([Release date (dd/mm/yyyy)], 'DD/MM/YYYY') as [Event Date], 
+	     date(Alt(date#([Expiry date  (dd/mm/yyyy)], 'DD/MM/YYYY'),makedate(2016,1,1))) as [Expiry Date], //new data should no longer have missing expiry dates, for old data we can hard code value as 1.1.2016
+		 right("Equipment number [KEN]",8) as [Equipment Code],
+	     floor(right("Equipment number [KEN]",8)) &'-'&date(date#([Release date (dd/mm/yyyy)], 'DD/MM/YYYY'),'YYYYMM') as [Equipment Year Month], 
+	     "Work Duration [min]" as [Event Planned Hours], 
+	     //1 as LIOIsExcluded
+	     if("Target [LIS/LIS+LIO]" like '*LIO*',0,1) as LIOIsExcluded
+        	
+    	From 'lib://$(pConn)$(wPath)/$(wFile)' $(pFmt)
+        $(wWhere);
+        Set wLoadPrefix = 'Concatenate';
+	Next wRow
+
+Else
+	Trace INFO: No files found;
+End If
+
+// Set status return parameter = number of files loaded.
+Let pStatus = wNum;
+
+// Clean up.
+Drop Table _TempList;
+
+End Sub
