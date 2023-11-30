@@ -31,10 +31,33 @@ def chooseO():
     elif ((a[x_coor,y_coor]!='X') or (a[x_coor,y_coor]!='O')):
       a[x_coor,y_coor]='O'
     print(a)
+	
+	
+def determine_winner(game_board):
+    """check if there is a win, draw"""
+    # check rows
+    for i in range(3):
+        if game_board[i*3] == game_board[i*3+1] == game_board[i*3+2] and game_board[i*3] in ('X', 'O'):
+            return game_board[i*3]
+    # check columns
+    for i in range(3):
+        if game_board[i] == game_board[i+3] == game_board[i+6] and game_board[i] in ('X', 'O'):
+            return game_board[i]
+    # check diagonals
+    if game_board[0] == game_board[4] == game_board[8] and game_board[0] in ('X', 'O'):
+        return game_board[0]
+    if game_board[2] == game_board[4] == game_board[6] and game_board[2] in ('X', 'O'):
+        return game_board[2]
+    # check tie
+    if all(x in ('X', 'O') for x in game_board):
+        return 'Tie'
+    # no winner or tie
+    return False
 
 while True:
   for step in range(0,9):
     chooseX()
     chooseO()
-      
+
+determine_winner(a)  
      
