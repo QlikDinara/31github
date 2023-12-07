@@ -51,6 +51,11 @@ def player_choice(board):
         position = int(input('Choose a position (1-9): '))
     return position
 
+def computer_move():
+    #place the 5
+    #check corners
+    pass
+
 
 def replay():
     choice = input('Do you want to play again? Enter Yes or No: ')
