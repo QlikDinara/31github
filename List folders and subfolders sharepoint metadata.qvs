@@ -1,0 +1,172 @@
+sub GetFirstLevelFolderLists 
+
+  Let wsTraceMessage = 'Begin loading list of first level folders for Site: $(vsSite) and Path: $(vsPathName)' ;
+  Trace $(wsTraceMessage); 
+
+LIB CONNECT TO 'Business Intelligence Extractors:C&O_MANUAL_DATA_SHAREPOINT-meta';
+
+   // To mange folders with no nested subfolders inside
+  set ErrorMode = 0;
+
+  SharePointFolderList:
+  LOAD 
+        Name as [ListFolders.Name],  
+        ServerRelativeUrl as [ListFolders.ServerRelativeUrl],
+        UniqueId as [ListFolders.UniqueId], 
+        ItemCount as [ListFolders.ItemCount],
+  		UniqueId as [Key_Folders_Files],
+        SubStringCount(ServerRelativeUrl,'/') as [ListFolders.FolderNestedLvel],
+        replace(ServerRelativeUrl,'$(vsSite)','') as [ListFolders.FolderToExplore]
+  ;
+
+  SELECT Name,
+      ServerRelativeUrl,
+      UniqueId,
+      id,
+      ItemCount 
+  FROM ListFolders
+  WITH PROPERTIES (
+  subSite='$(vsSite)',
+  folder='$(vsPathFullName)',
+  maxResults=''
+  );
+  
+  set ErrorMode = 1;
+  
+  Let wsTraceMessage = 'End of loading list of first level folders for Site: $(vsSite) and Path: $(vsPathName)' ;
+  Trace $(wsTraceMessage); 
+  
+end sub
+    
+    
+sub GetNestedFolderLists(wsNextedLevel0)
+
+  Let wsTraceMessage = 'Begin loading list of nested # $(wsNextedLevel0) level folders for Site: $(vsSite) and Path: $(vsPathName)' ;
+  Trace $(wsTraceMessage); 
+
+  // To manage the fact that firset level folder has not subFolders so the table SharePointFolderList do not exist
+  if not isnull(TableNumber('SharePointFolderList')) then
+ 
+    TmpItemsLoop:
+    Load
+      [ListFolders.FolderToExplore] as FolderToexplore,
+      [ListFolders.FolderNestedLvel] as FolderNestedLvel,
+      [ListFolders.ItemCount] as SubItems
+    resident SharePointFolderList
+    where 
+      [ListFolders.ItemCount] > 0
+      and
+      [ListFolders.FolderNestedLvel] = $(wsNextedLevel0)
+      ;
+
+    Let wsNumOfFolders = NoOfRows('TmpItemsLoop');
+    If '$(wsNumOfFolders)' > 0 Then 
+
+        LIB CONNECT TO '$(vsConnSharePointMetadata)';
+
+        For wsRun = 0 to wsNumOfFolders-1
+
+          Let wsFolderName = Peek('FolderToexplore',wsRun,'TmpItemsLoop');
+          Let wsItems = Peek('SubItems',wsRun,'TmpItemsLoop');
+          set wsSubPath = '$(vsSite)$(wsFolderName)';
+
+          // To mange folders with no nested subfolders inside
+          set ErrorMode = 0;
+
+          Concatenate(SharePointFolderList)
+          LOAD 
+          Name as [ListFolders.Name],  
+          ServerRelativeUrl as [ListFolders.ServerRelativeUrl], 
+          UniqueId as [ListFolders.UniqueId],
+          ItemCount as [ListFolders.ItemCount],
+          UniqueId as [Key_Folders_Files],
+          subStringCount(ServerRelativeUrl,'/') as [ListFolders.FolderNestedLvel],
+          replace(ServerRelativeUrl,'$(vsSite)','') as [ListFolders.FolderToExplore]
+          ;
+          SELECT 
+          Name,
+          ServerRelativeUrl,
+          UniqueId,
+          ItemCount 
+          FROM ListFolders
+          WITH PROPERTIES (
+          subSite='$(vsSite)',
+          folder='$(wsSubPath)',
+          maxResults=''
+          );
+
+          set ErrorMode = 1;
+
+        Next wsRun	
+    end if
+  
+
+      if not isnull(TableNumber('TmpItemsLoop')) then
+        drop table TmpItemsLoop;
+      end if
+
+      Let wsTraceMessage = 'End of loading list of nested # $(wsNextedLevel0) level folders for Site: $(vsSite) and Path: $(vsPathName)' ;
+      Trace $(wsTraceMessage); 
+
+
+      // check if there are nexted items and loop exted levels
+      let wsNextedLevel1 =  $(wsNextedLevel0)+1;
+
+      TmpItemsLoop:
+      Load
+        [ListFolders.FolderToExplore] as FolderToexplore,
+        [ListFolders.FolderNestedLvel] as FolderNestedLvel,
+        [ListFolders.ItemCount] as SubItems
+      resident SharePointFolderList
+      where 
+        [ListFolders.ItemCount] > 0
+        and
+        [ListFolders.FolderNestedLvel] = $(wsNextedLevel1)
+        ;
+
+      Let wsNumOfFolders =;
+      Let wsNumOfFolders = NoOfRows('TmpItemsLoop');
+
+      if not isnull(TableNumber('TmpItemsLoop')) then
+        drop table TmpItemsLoop;
+      end if
+      
+      If (wsNumOfFolders > 0) then
+        call GetNestedFolderLists ('$(wsNextedLevel1)')
+      End If
+      
+  End if // table SharePointFolderList do not exist
+ 
+  // Clean Variables
+  set wsPathName =;
+  set wsFolderName =;
+  set wsNumOfFolders =;
+  set wsSubPath =;
+  set wsRun =;
+  set wsTraceMessage=;
+
+end Sub
+
+sub GetFolderLists
+
+	Let wsTraceMessage = 'Begin loading list of folders for Site: $(vsSite) and Path: $(vsPathFullName)' ;
+  	Trace $(wsTraceMessage); 
+    
+    // Get First Leve
+	call GetFirstLevelFolderLists 
+    
+    // Get Nested Folder for level 0+1 and continue recursively 
+    call GetNestedFolderLists('$(vsDeepCount1)')
+
+    Let wsTraceMessage = 'End of loading list of folders for Site: $(vsSite) and Path: $(vsPathFullName)' ;
+    Trace $(wsTraceMessage); 
+  
+
+End Sub
+
+
+
+
+
+
+
