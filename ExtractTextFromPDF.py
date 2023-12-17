@@ -11,9 +11,10 @@ pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
 # get specific page of pdf by passing
 # number since it stores pages in list
 # to access first page pass 0
-pageObj = pdfReader.getPage(0)
+for page in range(10):
+    pageObj = pdfReader.getPage(page)
 # extract the page object
 # by extractText() function
-texts = pageObj.extractText()
+    texts = pageObj.extractText()
 # print the extracted texts
-print(texts)
+    print(texts)
