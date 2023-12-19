@@ -7,5 +7,6 @@ soup = BeautifulSoup(reqs.text, 'lxml')
 urls = []
 for h in soup.find_all('li'):
     a = h.find('a')
+    '''find all the urls'''
     urls.append(a.attrs['href'])
 print(urls)
