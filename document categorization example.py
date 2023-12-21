@@ -5,6 +5,7 @@ import time
 directory = 'C:\Users\dnc\OneDrive - QlikTech Inc\Documents\GitHub\31github'
 
 # Dictionary of file categories and their extensions
+# to do - add docx
 categories = {
     'Images': ['jpeg', 'jpg', 'png'],
     'PDFs': ['pdf'],
